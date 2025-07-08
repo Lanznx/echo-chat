@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { ChatMessage, ChatRequest, ChatResponse } from '@/types';
 
 interface ChatInterfaceProps {
@@ -35,8 +36,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
     setInputValue('');
     setIsLoading(true);
 
+    // Add empty assistant message that will be streamed
+    const assistantMessageId = (Date.now() + 1).toString();
+    const assistantMessage: ChatMessage = {
+      id: assistantMessageId,
+      content: '',
+      type: 'assistant',
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/chat/completion`, {
+      console.log('Sending streaming request to:', `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/chat/stream`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -48,28 +61,57 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get response');
+        throw new Error(`Failed to get response: ${response.status}`);
       }
 
-      const data: ChatResponse = await response.json();
-      
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        content: data.response,
-        type: 'assistant',
-        timestamp: new Date()
-      };
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let streamDone = false;
 
-      setMessages(prev => [...prev, assistantMessage]);
+      while (!streamDone) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              console.log('Received streaming data:', data);
+              if (data.chunk) {
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === assistantMessageId 
+                      ? { ...msg, content: msg.content + data.chunk }
+                      : msg
+                  )
+                );
+              } else if (data.done) {
+                console.log('Stream completed');
+                streamDone = true;
+                break;
+              } else if (data.error) {
+                throw new Error(data.error);
+              }
+            } catch (e) {
+              console.error('Error parsing streaming data:', e, 'Line:', line);
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('Error sending message:', error);
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        content: 'Sorry, there was an error processing your request. Please try again.',
-        type: 'assistant',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === assistantMessageId 
+            ? { ...msg, content: 'Sorry, there was an error processing your request. Please try again.' }
+            : msg
+        )
+      );
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +158,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                   : 'bg-gray-100 text-gray-800'
               }`}
             >
-              <div className="whitespace-pre-wrap">{message.content}</div>
+              <div className="prose prose-sm max-w-none">
+                <ReactMarkdown>{message.content}</ReactMarkdown>
+              </div>
               <div className={`text-xs mt-1 ${
                 message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
               }`}>
@@ -148,7 +192,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type your message..."
-            className="flex-1 p-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 p-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500"
             rows={2}
             disabled={isLoading}
           />

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AudioVisualizer } from './AudioVisualizer';
 
 interface TranscriptSidebarProps {
@@ -22,6 +22,20 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
   onStopRecording,
   onClearTranscript
 }) => {
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
+  
+  const copyTranscript = async () => {
+    if (!transcript) return;
+    
+    try {
+      await navigator.clipboard.writeText(transcript);
+      setCopyStatus('copied');
+      setTimeout(() => setCopyStatus('idle'), 2000);
+    } catch (error) {
+      console.error('Failed to copy transcript:', error);
+    }
+  };
+  
   return (
     <div className="w-80 bg-gray-50 border-r border-gray-200 flex flex-col h-full">
       <div className="p-4 border-b border-gray-200">
@@ -47,6 +61,16 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
               className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors"
             >
               Clear
+            </button>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={copyTranscript}
+              disabled={!transcript}
+              className="flex-1 py-2 px-4 rounded-lg font-medium transition-colors bg-green-500 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {copyStatus === 'copied' ? 'Copied!' : 'Copy Transcript'}
             </button>
           </div>
         </div>

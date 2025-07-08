@@ -1,9 +1,10 @@
 from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
-from typing import Optional
+from typing import Optional, AsyncGenerator
 import json
 import logging
 import asyncio
@@ -93,6 +94,39 @@ async def chat_completion(request: ChatRequest):
     except Exception as e:
         logger.error(f"Chat completion error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/chat/stream")
+async def chat_stream(request: ChatRequest):
+    async def generate_stream() -> AsyncGenerator[str, None]:
+        try:
+            llm_service = get_llm_service()
+            response = await llm_service.get_completion(
+                context=request.context,
+                query=request.query
+            )
+            
+            # Simulate streaming by yielding chunks
+            words = response.split(' ')
+            for i, word in enumerate(words):
+                chunk = word + (' ' if i < len(words) - 1 else '')
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+                await asyncio.sleep(0.1)  # Small delay for streaming effect
+            
+            yield f"data: {json.dumps({'done': True})}\n\n"
+            
+        except Exception as e:
+            logger.error(f"Chat streaming error: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*"
+        }
+    )
 
 @app.get("/health")
 async def health_check():
