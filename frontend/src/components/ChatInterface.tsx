@@ -182,11 +182,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
           </div>
         </CardHeader>
         
-        <CardContent className="flex-1 p-0">
-          <ScrollArea className="h-full p-4">
-            <div className="space-y-4">
+        <CardContent className="flex-1 p-0 overflow-hidden">
+          <ScrollArea className="h-full max-h-full">
+            <div className="p-4 space-y-3">
               {messages.length === 0 && (
-                <div className="text-center py-8">
+                <div className="text-center py-6">
                   <div className="text-lg mb-2">👋 Welcome to EchoChat!</div>
                   <p className="text-muted-foreground">Start recording to generate a transcript, then ask me anything about it.</p>
                 </div>
@@ -211,11 +211,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
                     }`}>
-                      <CardContent className="p-3">
+                      <CardContent className="px-3 py-2">
                         <div className="prose prose-sm max-w-none dark:prose-invert">
                           <ReactMarkdown>{message.content}</ReactMarkdown>
                         </div>
-                        <div className={`text-xs mt-2 ${
+                        <div className={`text-xs mt-1 ${
                           message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
                         }`}>
                           {message.timestamp.toLocaleTimeString()}
@@ -243,7 +243,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                       </div>
                     </div>
                     <Card className="bg-muted">
-                      <CardContent className="p-3">
+                      <CardContent className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           <span className="text-sm text-muted-foreground">AI is thinking...</span>

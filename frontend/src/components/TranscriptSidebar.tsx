@@ -64,7 +64,7 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
   };
   
   return (
-    <Card className="w-80 flex flex-col h-full border-r rounded-none">
+    <Card className="flex flex-col h-full border-r rounded-none">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2">
           <Mic className="h-5 w-5" />
@@ -165,14 +165,16 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
         <Separator className="mt-4" />
       </CardHeader>
       
-      <CardContent className="flex-1 p-0">
-        <ScrollArea className="h-full px-6 pb-6">
-          <div className="text-sm leading-relaxed whitespace-pre-wrap">
-            {transcript || (
-              <div className="text-muted-foreground italic text-center py-8">
-                Click &quot;Start Recording&quot; to begin transcribing your voice...
-              </div>
-            )}
+      <CardContent className="flex-1 p-0 overflow-hidden">
+        <ScrollArea className="h-full max-h-full">
+          <div className="px-4 py-2">
+            <div className="text-sm leading-relaxed whitespace-pre-wrap">
+              {transcript || (
+                <div className="text-muted-foreground italic text-center py-6">
+                  Click &quot;Start Recording&quot; to begin transcribing your voice...
+                </div>
+              )}
+            </div>
           </div>
         </ScrollArea>
       </CardContent>

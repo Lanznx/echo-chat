@@ -75,23 +75,29 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen bg-background">
-      <TranscriptSidebar
-        transcript={transcript}
-        isRecording={isRecording || isSystemAudioCapturing}
-        audioLevel={audioLevel}
-        isReceiving={isReceiving}
-        onStartRecording={selectedSystemDevice ? handleStartSystemRecording : handleStartRecording}
-        onStopRecording={isSystemAudioCapturing ? handleStopSystemRecording : handleStopRecording}
-        onClearTranscript={handleClearTranscript}
-        audioDevices={audioDevices}
-        selectedDevice={selectedDevice}
-        onDeviceSelect={setSelectedDevice}
-        onRefreshDevices={refreshDevices}
-        onSystemAudioSelect={handleSystemAudioSelect}
-      />
-      
-      <ChatInterface transcript={transcript} />
+    <div className="h-screen bg-background overflow-hidden">
+      <div className="flex h-full">
+        <div className="w-80 flex-shrink-0">
+          <TranscriptSidebar
+            transcript={transcript}
+            isRecording={isRecording || isSystemAudioCapturing}
+            audioLevel={audioLevel}
+            isReceiving={isReceiving}
+            onStartRecording={selectedSystemDevice ? handleStartSystemRecording : handleStartRecording}
+            onStopRecording={isSystemAudioCapturing ? handleStopSystemRecording : handleStopRecording}
+            onClearTranscript={handleClearTranscript}
+            audioDevices={audioDevices}
+            selectedDevice={selectedDevice}
+            onDeviceSelect={setSelectedDevice}
+            onRefreshDevices={refreshDevices}
+            onSystemAudioSelect={handleSystemAudioSelect}
+          />
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <ChatInterface transcript={transcript} />
+        </div>
+      </div>
     </div>
   );
 }
