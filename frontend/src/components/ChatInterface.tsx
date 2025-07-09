@@ -4,6 +4,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ChatMessage, ChatRequest, ChatResponse } from '@/types';
 import { SettingsModal } from './SettingsModal';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Settings, Send, Bot, User, Loader2 } from 'lucide-react';
 
 interface ChatInterfaceProps {
   transcript: string;
@@ -141,104 +148,143 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      <div className="p-4 border-b border-gray-200 bg-white">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-800">Chat with AI</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Ask questions about your transcript or chat naturally
-            </p>
+      <Card className="flex-1 flex flex-col h-full border-l-0 rounded-none">
+        <CardHeader className="border-b">
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5" />
+                Chat with AI
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Ask questions about your transcript or chat naturally
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={llmProvider} onValueChange={(value) => setLlmProvider(value as 'openai' | 'gemini')}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="gemini">Gemini</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSettingsOpen(true)}
+                title="AI 角色設定"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={llmProvider}
-              onChange={(e) => setLlmProvider(e.target.value as 'openai' | 'gemini')}
-              className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        </CardHeader>
+        
+        <CardContent className="flex-1 p-0">
+          <ScrollArea className="h-full p-4">
+            <div className="space-y-4">
+              {messages.length === 0 && (
+                <div className="text-center py-8">
+                  <div className="text-lg mb-2">👋 Welcome to EchoChat!</div>
+                  <p className="text-muted-foreground">Start recording to generate a transcript, then ask me anything about it.</p>
+                </div>
+              )}
+              
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className="flex gap-2 max-w-[80%]">
+                    {message.type === 'assistant' && (
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                          <Bot className="h-4 w-4" />
+                        </div>
+                      </div>
+                    )}
+                    
+                    <Card className={`${
+                      message.type === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
+                    }`}>
+                      <CardContent className="p-3">
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                        <div className={`text-xs mt-2 ${
+                          message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                        }`}>
+                          {message.timestamp.toLocaleTimeString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    {message.type === 'user' && (
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
+                          <User className="h-4 w-4" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="flex gap-2">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                        <Bot className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <Card className="bg-muted">
+                      <CardContent className="p-3">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm text-muted-foreground">AI is thinking...</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+        </CardContent>
+        
+        <div className="border-t p-4">
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <Textarea
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e as any);
+                }
+              }}
+              placeholder="Type your message..."
+              className="flex-1 min-h-[60px] resize-none"
+              disabled={isLoading}
+            />
+            <Button
+              type="submit"
+              disabled={!inputValue.trim() || isLoading}
+              size="sm"
+              className="self-end"
             >
-              <option value="openai">OpenAI</option>
-              <option value="gemini">Gemini</option>
-            </select>
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              title="AI 角色設定"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-          </div>
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
         </div>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="text-center text-gray-500 mt-8">
-            <div className="text-lg mb-2">👋 Welcome to EchoChat!</div>
-            <p>Start recording to generate a transcript, then ask me anything about it.</p>
-          </div>
-        )}
-        
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] p-3 rounded-lg ${
-                message.type === 'user'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-800'
-              }`}
-            >
-              <div className="prose prose-sm max-w-none">
-                <ReactMarkdown>{message.content}</ReactMarkdown>
-              </div>
-              <div className={`text-xs mt-1 ${
-                message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
-              }`}>
-                {message.timestamp.toLocaleTimeString()}
-              </div>
-            </div>
-          </div>
-        ))}
-        
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        <div ref={messagesEndRef} />
-      </div>
-      
-      <div className="p-4 border-t border-gray-200 bg-white">
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <textarea
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type your message..."
-            className="flex-1 p-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500"
-            rows={2}
-            disabled={isLoading}
-          />
-          <button
-            type="submit"
-            disabled={!inputValue.trim() || isLoading}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Send
-          </button>
-        </form>
-      </div>
+      </Card>
       
       <SettingsModal
         isOpen={isSettingsOpen}

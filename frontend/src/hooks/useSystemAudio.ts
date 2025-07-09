@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { isTauri } from '@/utils/tauri';
+import { AUDIO_PROCESSING_CONFIG } from '@/config/audio';
 
 export interface AudioDevice {
   name: string;
@@ -7,12 +8,22 @@ export interface AudioDevice {
   is_default: boolean;
 }
 
+export interface SystemAudioDevice {
+  name: string;
+  device_type: string; // "system_output"
+  is_default: boolean;
+}
+
 export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
   const [isCapturing, setIsCapturing] = useState(false);
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
+  const [systemAudioDevices, setSystemAudioDevices] = useState<SystemAudioDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [selectedSystemDevice, setSelectedSystemDevice] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [isSystemAudioCapturing, setIsSystemAudioCapturing] = useState(false);
   const unlistenRef = useRef<(() => void) | null>(null);
+  const systemUnlistenRef = useRef<(() => void) | null>(null);
 
   // List available audio devices
   const listDevices = async () => {
@@ -38,6 +49,22 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
     }
   };
 
+  // List system audio devices
+  const listSystemAudioDevices = async () => {
+    if (!isTauri()) {
+      console.log('Not in Tauri environment, skipping system audio device listing');
+      return;
+    }
+    
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const devices = await invoke<SystemAudioDevice[]>('list_system_audio_devices');
+      setSystemAudioDevices(devices);
+    } catch (error) {
+      console.error('Failed to list system audio devices:', error);
+    }
+  };
+
   // Start system audio capture
   const startCapture = async (deviceName?: string) => {
     if (!isTauri()) {
@@ -53,14 +80,35 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
         const audioData = new Uint8Array(event.payload);
         onAudioData(audioData.buffer);
         
-        // Calculate audio level for visualization
+        // Calculate audio level for visualization with better sensitivity
         const samples = new Int16Array(audioData.buffer);
         let sum = 0;
+        let peak = 0;
+        
         for (let i = 0; i < samples.length; i++) {
-          sum += Math.abs(samples[i]);
+          const absValue = Math.abs(samples[i]);
+          sum += absValue;
+          peak = Math.max(peak, absValue);
         }
-        const avgLevel = sum / samples.length / 32768; // Normalize to 0-1
-        setAudioLevel(avgLevel);
+        
+        const avgLevel = sum / samples.length / AUDIO_PROCESSING_CONFIG.SAMPLE_RATE_NORMALIZATION;
+        const peakLevel = peak / AUDIO_PROCESSING_CONFIG.SAMPLE_RATE_NORMALIZATION;
+        
+        // Use a combination of average and peak for more responsive visualization
+        // Increase sensitivity by amplifying the signal
+        const responsiveLevel = Math.min(
+          AUDIO_PROCESSING_CONFIG.MAX_LEVEL, 
+          avgLevel * AUDIO_PROCESSING_CONFIG.AVERAGE_LEVEL_AMPLIFICATION + 
+          peakLevel * AUDIO_PROCESSING_CONFIG.PEAK_LEVEL_AMPLIFICATION
+        );
+        
+        // Add some smoothing but keep responsiveness
+        setAudioLevel(prevLevel => {
+          const smoothing = responsiveLevel > prevLevel ? 
+            AUDIO_PROCESSING_CONFIG.ATTACK_SMOOTHING : 
+            AUDIO_PROCESSING_CONFIG.DECAY_SMOOTHING;
+          return prevLevel + (responsiveLevel - prevLevel) * smoothing;
+        });
       });
       
       unlistenRef.current = unlisten;
@@ -114,6 +162,7 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
     // Only list devices if in Tauri environment
     if (isTauri()) {
       listDevices();
+      listSystemAudioDevices();
     }
   }, []);
 
@@ -123,8 +172,100 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
       if (unlistenRef.current) {
         unlistenRef.current();
       }
+      if (systemUnlistenRef.current) {
+        systemUnlistenRef.current();
+      }
     };
   }, []);
+
+  // Start system audio capture
+  const startSystemAudioCapture = async (deviceName: string) => {
+    if (!isTauri()) {
+      throw new Error('System audio capture is only available in Tauri environment');
+    }
+    
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const { listen } = await import('@tauri-apps/api/event');
+      
+      // Set up system audio data listener
+      const unlisten = await listen<number[]>('system-audio-data', (event) => {
+        const audioData = new Uint8Array(event.payload);
+        onAudioData(audioData.buffer);
+        
+        // Calculate audio level for visualization with better sensitivity
+        const samples = new Int16Array(audioData.buffer);
+        let sum = 0;
+        let peak = 0;
+        
+        for (let i = 0; i < samples.length; i++) {
+          const absValue = Math.abs(samples[i]);
+          sum += absValue;
+          peak = Math.max(peak, absValue);
+        }
+        
+        const avgLevel = sum / samples.length / AUDIO_PROCESSING_CONFIG.SAMPLE_RATE_NORMALIZATION;
+        const peakLevel = peak / AUDIO_PROCESSING_CONFIG.SAMPLE_RATE_NORMALIZATION;
+        
+        // Use a combination of average and peak for more responsive visualization
+        // Increase sensitivity by amplifying the signal
+        const responsiveLevel = Math.min(
+          AUDIO_PROCESSING_CONFIG.MAX_LEVEL, 
+          avgLevel * AUDIO_PROCESSING_CONFIG.AVERAGE_LEVEL_AMPLIFICATION + 
+          peakLevel * AUDIO_PROCESSING_CONFIG.PEAK_LEVEL_AMPLIFICATION
+        );
+        
+        // Add some smoothing but keep responsiveness
+        setAudioLevel(prevLevel => {
+          const smoothing = responsiveLevel > prevLevel ? 
+            AUDIO_PROCESSING_CONFIG.ATTACK_SMOOTHING : 
+            AUDIO_PROCESSING_CONFIG.DECAY_SMOOTHING;
+          return prevLevel + (responsiveLevel - prevLevel) * smoothing;
+        });
+      });
+      
+      systemUnlistenRef.current = unlisten;
+      
+      // Start system audio capture with selected device
+      await invoke('start_system_audio_capture_device', { deviceName });
+      setIsSystemAudioCapturing(true);
+      setSelectedSystemDevice(deviceName);
+      console.log('System audio capture started with device:', deviceName);
+    } catch (error) {
+      console.error('Failed to start system audio capture:', error);
+      throw error;
+    }
+  };
+
+  // Stop system audio capture
+  const stopSystemAudioCapture = async () => {
+    if (!isTauri()) {
+      console.log('Not in Tauri environment, nothing to stop');
+      return;
+    }
+    
+    if (!isSystemAudioCapturing) {
+      console.log('System audio capture not running, nothing to stop');
+      return;
+    }
+    
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('stop_system_audio_capture_device');
+      setIsSystemAudioCapturing(false);
+      setAudioLevel(0);
+      
+      // Clean up event listener
+      if (systemUnlistenRef.current) {
+        systemUnlistenRef.current();
+        systemUnlistenRef.current = null;
+      }
+      
+      console.log('System audio capture stopped');
+    } catch (error) {
+      console.error('Failed to stop system audio capture:', error);
+    }
+  };
 
   return {
     startCapture,
@@ -134,6 +275,14 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
     audioLevel,
     audioDevices,
     selectedDevice,
-    setSelectedDevice
+    setSelectedDevice,
+    // System audio methods
+    startSystemAudioCapture,
+    stopSystemAudioCapture,
+    listSystemAudioDevices,
+    isSystemAudioCapturing,
+    systemAudioDevices,
+    selectedSystemDevice,
+    setSelectedSystemDevice
   };
 };
