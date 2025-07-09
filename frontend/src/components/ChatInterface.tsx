@@ -184,7 +184,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
         
         <CardContent className="flex-1 p-0 overflow-hidden">
           <ScrollArea className="h-full max-h-full">
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-2">
               {messages.length === 0 && (
                 <div className="text-center py-6">
                   <div className="text-lg mb-2">👋 Welcome to EchoChat!</div>
@@ -197,7 +197,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                   key={message.id}
                   className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className="flex gap-2 max-w-[80%]">
+                  <div className="flex gap-2 max-w-[75%]">
                     {message.type === 'assistant' && (
                       <div className="flex-shrink-0">
                         <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
@@ -210,10 +210,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                       message.type === 'user'
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
-                    }`}>
+                    } min-w-0 break-words p-0`}>
                       <CardContent className="px-3 py-2">
-                        <div className="prose prose-sm max-w-none dark:prose-invert">
-                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        <div className="prose prose-sm max-w-none dark:prose-invert break-words [&>*]:my-0 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                          <ReactMarkdown 
+                            components={{
+                              p: ({ children }) => <p className="break-words whitespace-pre-wrap my-0">{children}</p>,
+                              code: ({ children }) => <code className="break-words">{children}</code>,
+                              pre: ({ children }) => <pre className="break-words overflow-x-auto my-0">{children}</pre>
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
                         </div>
                         <div className={`text-xs mt-1 ${
                           message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
@@ -242,7 +250,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                         <Bot className="h-4 w-4" />
                       </div>
                     </div>
-                    <Card className="bg-muted">
+                    <Card className="bg-muted min-w-0 break-words p-0">
                       <CardContent className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
