@@ -30,6 +30,9 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     context: str
     query: str
+    provider: Optional[str] = None
+    system_prompt: Optional[str] = None
+    user_role: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -85,10 +88,12 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.post("/api/chat/completion", response_model=ChatResponse)
 async def chat_completion(request: ChatRequest):
     try:
-        llm_service = get_llm_service()
+        llm_service = get_llm_service(request.provider)
         response = await llm_service.get_completion(
             context=request.context,
-            query=request.query
+            query=request.query,
+            system_prompt=request.system_prompt,
+            user_role=request.user_role
         )
         return ChatResponse(response=response)
     except Exception as e:
@@ -99,10 +104,12 @@ async def chat_completion(request: ChatRequest):
 async def chat_stream(request: ChatRequest):
     async def generate_stream() -> AsyncGenerator[str, None]:
         try:
-            llm_service = get_llm_service()
+            llm_service = get_llm_service(request.provider)
             response = await llm_service.get_completion(
                 context=request.context,
-                query=request.query
+                query=request.query,
+                system_prompt=request.system_prompt,
+                user_role=request.user_role
             )
             
             # Simulate streaming by yielding chunks

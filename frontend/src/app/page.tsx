@@ -13,7 +13,6 @@ export default function Home() {
     disconnect, 
     sendAudio, 
     clearTranscript, 
-    isConnected, 
     transcript, 
     isReceiving 
   } = useWebSocket(wsUrl);
@@ -22,7 +21,11 @@ export default function Home() {
     startRecording, 
     stopRecording, 
     isRecording, 
-    audioLevel 
+    audioLevel,
+    audioDevices,
+    selectedDevice,
+    setSelectedDevice,
+    refreshDevices
   } = useAudioRecorder(sendAudio);
 
   const handleStartRecording = () => {
@@ -49,6 +52,10 @@ export default function Home() {
         onStartRecording={handleStartRecording}
         onStopRecording={handleStopRecording}
         onClearTranscript={handleClearTranscript}
+        audioDevices={audioDevices}
+        selectedDevice={selectedDevice}
+        onDeviceSelect={setSelectedDevice}
+        onRefreshDevices={refreshDevices}
       />
       
       <ChatInterface transcript={transcript} />

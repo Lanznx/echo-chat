@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ChatMessage, ChatRequest, ChatResponse } from '@/types';
+import { SettingsModal } from './SettingsModal';
 
 interface ChatInterfaceProps {
   transcript: string;
@@ -13,6 +14,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Settings state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState('你是一個聰明的 AI 參與會議者. 我需要你用繁體中文，並且根據會議的前後文回答問題.');
+  const [userRole, setUserRole] = useState('');
+  const [llmProvider, setLlmProvider] = useState<'openai' | 'gemini'>('openai');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -56,7 +63,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
         },
         body: JSON.stringify({
           context: transcript,
-          query: query
+          query: query,
+          provider: llmProvider,
+          system_prompt: systemPrompt,
+          user_role: userRole
         } as ChatRequest),
       });
 
@@ -132,10 +142,34 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
   return (
     <div className="flex-1 flex flex-col h-full">
       <div className="p-4 border-b border-gray-200 bg-white">
-        <h2 className="text-lg font-semibold text-gray-800">Chat with AI</h2>
-        <p className="text-sm text-gray-600 mt-1">
-          Ask questions about your transcript or chat naturally
-        </p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">Chat with AI</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Ask questions about your transcript or chat naturally
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={llmProvider}
+              onChange={(e) => setLlmProvider(e.target.value as 'openai' | 'gemini')}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Gemini</option>
+            </select>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              title="AI 角色設定"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -205,6 +239,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
           </button>
         </form>
       </div>
+      
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        systemPrompt={systemPrompt}
+        userRole={userRole}
+        onSystemPromptChange={setSystemPrompt}
+        onUserRoleChange={setUserRole}
+      />
     </div>
   );
 };

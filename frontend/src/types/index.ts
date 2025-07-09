@@ -14,6 +14,9 @@ export interface ChatMessage {
 export interface ChatRequest {
   context: string;
   query: string;
+  provider?: string;
+  system_prompt?: string;
+  user_role?: string;
 }
 
 export interface ChatResponse {

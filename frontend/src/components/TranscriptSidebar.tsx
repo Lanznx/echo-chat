@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AudioVisualizer } from './AudioVisualizer';
+import AudioDeviceSelector from './AudioDeviceSelector';
+import { AudioDevice } from '@/hooks/useSystemAudio';
+import { isTauri } from '@/utils/tauri';
 
 interface TranscriptSidebarProps {
   transcript: string;
@@ -11,6 +14,10 @@ interface TranscriptSidebarProps {
   onStartRecording: () => void;
   onStopRecording: () => void;
   onClearTranscript: () => void;
+  audioDevices?: AudioDevice[];
+  selectedDevice?: string | null;
+  onDeviceSelect?: (deviceName: string) => void;
+  onRefreshDevices?: () => void;
 }
 
 export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
@@ -20,9 +27,18 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
   isReceiving,
   onStartRecording,
   onStopRecording,
-  onClearTranscript
+  onClearTranscript,
+  audioDevices,
+  selectedDevice,
+  onDeviceSelect,
+  onRefreshDevices
 }) => {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   const copyTranscript = async () => {
     if (!transcript) return;
@@ -42,6 +58,17 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Live Transcript</h2>
         
         <div className="space-y-4">
+          {/* Audio Device Selector - Only show in Tauri environment */}
+          {isMounted && isTauri() && audioDevices && onDeviceSelect && onRefreshDevices && (
+            <AudioDeviceSelector
+              devices={audioDevices}
+              selectedDevice={selectedDevice || null}
+              onDeviceSelect={onDeviceSelect}
+              onRefresh={onRefreshDevices}
+              disabled={isRecording}
+            />
+          )}
+          
           <AudioVisualizer audioLevel={audioLevel} isRecording={isRecording} />
           
           <div className="flex gap-2">
@@ -87,7 +114,7 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
         <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
           {transcript || (
             <div className="text-gray-400 italic">
-              Click "Start Recording" to begin transcribing your voice...
+              Click &quot;Start Recording&quot; to begin transcribing your voice...
             </div>
           )}
         </div>

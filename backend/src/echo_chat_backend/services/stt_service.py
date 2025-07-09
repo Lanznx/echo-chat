@@ -51,7 +51,7 @@ class DeepgramSttAdapter(ISttServiceProvider):
             "smart_format": True,
             "interim_results": True,
             "encoding": "linear16",
-            "sample_rate": 16000,
+            "sample_rate": 48000,  # Match Tauri's actual sample rate
             "channels": 1,
             "endpointing": 300,  # Extend endpointing for better streaming
             "vad_events": True,  # Voice activity detection
