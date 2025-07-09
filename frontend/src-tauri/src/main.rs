@@ -1,7 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::Emitter;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -27,7 +26,7 @@ async fn start_system_audio_capture(
     println!("Starting system audio capture...");
     
     {
-        let mut audio_capture = state.audio_capture.lock().unwrap();
+        let audio_capture = state.audio_capture.lock().unwrap();
         if audio_capture.is_some() {
             return Err("Audio capture already running".to_string());
         }
@@ -87,7 +86,7 @@ async fn start_system_audio_capture_device(
     println!("Starting system audio capture for device: {}", device_name);
     
     {
-        let mut system_audio_capture = state.system_audio_capture.lock().unwrap();
+        let system_audio_capture = state.system_audio_capture.lock().unwrap();
         if system_audio_capture.is_some() {
             return Err("System audio capture already running".to_string());
         }
@@ -153,7 +152,7 @@ fn main() {
             stop_system_audio_capture_device,
             list_system_audio_devices
         ])
-        .setup(|app| {
+        .setup(|_app| {
             // Only open devtools when explicitly needed
             // #[cfg(debug_assertions)]
             // {

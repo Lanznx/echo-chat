@@ -119,13 +119,22 @@ export const useAudioRecorder = (onAudioData: (data: ArrayBuffer) => void) => {
     if (!analyserRef.current) return;
 
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    let smoothedLevel = 0;
     
     const updateLevel = () => {
       if (!analyserRef.current || !isRecordingRef.current) return;
       
       analyserRef.current.getByteFrequencyData(dataArray);
       const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-      setAudioLevel(average / 255);
+      const currentLevel = average / 255;
+      
+      // Apply smoothing for more responsive visualization
+      const smoothingFactor = currentLevel > smoothedLevel ? 0.8 : 0.4;
+      smoothedLevel = smoothedLevel + (currentLevel - smoothedLevel) * smoothingFactor;
+      
+      // Apply amplification for better visibility
+      const amplifiedLevel = Math.min(1.0, smoothedLevel * 3.0);
+      setAudioLevel(amplifiedLevel);
       
       if (isRecordingRef.current) {
         requestAnimationFrame(updateLevel);

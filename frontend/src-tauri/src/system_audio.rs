@@ -1,8 +1,6 @@
 use tauri::{AppHandle, Emitter};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Host, Stream, StreamConfig, SampleFormat, BufferSize, SampleRate};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use cpal::{StreamConfig, SampleFormat, BufferSize, SampleRate};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -14,7 +12,7 @@ pub struct SystemAudioDevice {
 
 #[cfg(target_os = "macos")]
 pub struct SystemAudioCapture {
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
 }
 
 #[cfg(target_os = "macos")]
@@ -168,7 +166,7 @@ impl SystemAudioCapture {
         std::mem::forget(stream);
         
         let capture = SystemAudioCapture {
-            app_handle,
+            _app_handle: app_handle,
         };
         
         Ok(capture)

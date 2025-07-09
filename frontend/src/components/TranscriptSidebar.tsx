@@ -109,7 +109,10 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
             </div>
           )}
           
-          <AudioVisualizer audioLevel={audioLevel} isRecording={isRecording} />
+          <AudioVisualizer 
+            audioLevel={audioLevel} 
+            isRecording={isRecording}
+          />
           
           <div className="flex gap-2">
             <Button

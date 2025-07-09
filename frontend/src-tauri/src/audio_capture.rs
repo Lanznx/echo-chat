@@ -1,8 +1,6 @@
 use tauri::{AppHandle, Emitter};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Host, Stream, StreamConfig, SampleFormat, BufferSize, SampleRate};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use cpal::{StreamConfig, SampleFormat, BufferSize, SampleRate};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -13,11 +11,12 @@ pub struct AudioDevice {
 }
 
 pub struct AudioCapture {
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
     // We'll use a simpler approach - let the stream live independently
 }
 
 impl AudioCapture {
+    #[allow(dead_code)]
     pub async fn new(app_handle: AppHandle) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         Self::new_with_device(app_handle, None).await
     }
@@ -176,7 +175,7 @@ impl AudioCapture {
         std::mem::forget(stream); // Keep the stream alive
         
         let capture = AudioCapture {
-            app_handle,
+            _app_handle: app_handle,
         };
         
         Ok(capture)
