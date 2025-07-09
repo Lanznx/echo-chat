@@ -42,7 +42,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-800">AI 角色設定</h2>
@@ -94,7 +94,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               重置為預設值
             </button>
-            
+
             <div className="flex gap-2">
               <button
                 onClick={handleCancel}
