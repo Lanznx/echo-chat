@@ -1,6 +1,18 @@
+// 代表一個有時間和講者資訊的語句片段
+export interface TranscriptSegment {
+  text: string;
+  speaker: string; // e.g., "Speaker A", "Speaker B"
+  start_time: number; // 單位：秒
+  end_time: number;   // 單位：秒
+  confidence?: number;
+}
+
+// WebSocket 回傳的完整資料結構
 export interface TranscriptResponse {
-  transcript: string;
-  is_final: boolean;
+  is_final: boolean; // 標示是否為最終結果
+  segments: TranscriptSegment[]; // 包含一個或多個語句片段
+  // 向後相容性：保留舊格式
+  transcript?: string;
   confidence?: number;
 }
 
@@ -14,9 +26,9 @@ export interface ChatMessage {
 export interface ChatRequest {
   context: string;
   query: string;
-  provider?: string;
-  system_prompt?: string;
-  user_role?: string;
+  provider: string;
+  system_prompt: string;
+  user_role: string;
 }
 
 export interface ChatResponse {
@@ -34,9 +46,9 @@ export interface ProviderMetadata {
   display_name: string;
   description: string;
   version: string;
-  provider_type: 'llm' | 'stt';
+  provider_type: 'stt' | 'llm';
   requires_api_key: boolean;
-  config_schema: Record<string, any>;
+  config_schema: Record<string, unknown>;
   supported_models: string[];
   default_model: string;
   capabilities: string[];

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ChatMessage, ChatRequest, ChatResponse } from '@/types';
 import { SettingsModal } from './SettingsModal';
@@ -23,8 +23,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [idCounter, setIdCounter] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   // Settings state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState('你是一個聰明的 AI 參與會議者. 我需要你用繁體中文，並且根據會議的前後文回答問題.');
@@ -40,19 +41,27 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
     scrollToBottom();
   }, [messages]);
 
-  const createUserMessage = (query: string): ChatMessage => ({
-    id: Date.now().toString(),
-    content: query,
-    type: 'user',
-    timestamp: new Date()
-  });
+  const createUserMessage = (query: string): ChatMessage => {
+    const id = `user-${idCounter}`;
+    setIdCounter(prev => prev + 1);
+    return {
+      id,
+      content: query,
+      type: 'user',
+      timestamp: new Date()
+    };
+  };
 
-  const createAssistantMessage = (): ChatMessage => ({
-    id: (Date.now() + 1).toString(),
-    content: '',
-    type: 'assistant',
-    timestamp: new Date()
-  });
+  const createAssistantMessage = (): ChatMessage => {
+    const id = `assistant-${idCounter}`;
+    setIdCounter(prev => prev + 1);
+    return {
+      id,
+      content: '',
+      type: 'assistant',
+      timestamp: new Date()
+    };
+  };
 
   const buildChatRequest = (query: string): ChatRequest => ({
     context: transcript,
@@ -63,9 +72,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
   });
 
   const updateMessageContent = (messageId: string, newContent: string) => {
-    setMessages(prev => 
-      prev.map(msg => 
-        msg.id === messageId 
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === messageId
           ? { ...msg, content: newContent }
           : msg
       )
@@ -73,9 +82,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
   };
 
   const appendMessageChunk = (messageId: string, chunk: string) => {
-    setMessages(prev => 
-      prev.map(msg => 
-        msg.id === messageId 
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === messageId
           ? { ...msg, content: msg.content + chunk }
           : msg
       )
@@ -84,11 +93,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
 
   const processStreamLine = (line: string, assistantMessageId: string): boolean => {
     if (!line.startsWith('data: ')) return false;
-    
+
     try {
       const data = JSON.parse(line.slice(6));
       console.log('Received streaming data:', data);
-      
+
       if (data.chunk) {
         appendMessageChunk(assistantMessageId, data.chunk);
         return false;
@@ -128,7 +137,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
   const sendChatRequest = async (chatRequest: ChatRequest): Promise<Response> => {
     const apiUrl = `${appConfig.apiBaseUrl}/api/chat/stream`;
     console.log('Sending streaming request to:', apiUrl);
-    
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -157,7 +166,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
 
     const userMessage = createUserMessage(query);
     const assistantMessage = createAssistantMessage();
-    
+
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
@@ -189,52 +198,62 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
   return (
     <div className="flex-1 flex flex-col h-full">
       <Card className="flex-1 flex flex-col h-full border-0 rounded-none">
-        <CardHeader className="border-b px-4 py-3">
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="flex items-center gap-2">
+        <CardHeader className="border-b px-4 py-4">
+          <div className="flex justify-between items-start gap-4">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="flex items-center gap-2 text-lg mb-1">
                 <Bot className="h-5 w-5" />
                 Chat with AI
               </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground">
                 Ask questions about your transcript or chat naturally
               </p>
             </div>
-            <div className="flex items-center gap-2 min-w-0">
-              <ProviderSelector
-                providers={llmProviders.providers}
-                selectedProvider={llmProviders.selectedProvider}
-                selectedModel={llmProviders.selectedModel}
-                onProviderChange={llmProviders.selectProvider}
-                onModelChange={llmProviders.selectModel}
-                isLoading={llmProviders.isLoading}
-                error={llmProviders.error}
-                onRefresh={llmProviders.refreshProviders}
-                showModels={false}
-                className="min-w-0 flex-1"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsSettingsOpen(true)}
-                title="AI 角色設定"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
+            <div className="flex items-start gap-2 flex-shrink-0">
+              <div className="flex flex-col gap-1.5 min-w-0">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  AI Provider
+                </label>
+                <div className="min-w-[180px]">
+                  <ProviderSelector
+                    providers={llmProviders.providers}
+                    selectedProvider={llmProviders.selectedProvider}
+                    selectedModel={llmProviders.selectedModel}
+                    onProviderChange={llmProviders.selectProvider}
+                    onModelChange={llmProviders.selectModel}
+                    isLoading={llmProviders.isLoading}
+                    error={llmProviders.error}
+                    onRefresh={llmProviders.refreshProviders}
+                    showModels={false}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col items-end pt-5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsSettingsOpen(true)}
+                  title="AI 角色設定"
+                  className="h-8 w-8 p-0"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent className="flex-1 p-0 overflow-hidden">
           <ScrollArea className="h-full max-h-full">
-            <div className="p-4 space-y-2">
+            <div className="p-6 space-y-4">
               {messages.length === 0 && (
-                <div className="text-center py-6">
+                <div className="text-center py-8">
                   <div className="text-lg mb-2">👋 Welcome to EchoChat!</div>
-                  <p className="text-muted-foreground">Start recording to generate a transcript, then ask me anything about it.</p>
+                  <p className="text-muted-foreground max-w-md mx-auto">Start recording to generate a transcript, then ask me anything about it.</p>
                 </div>
               )}
-              
+
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -248,15 +267,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                         </div>
                       </div>
                     )}
-                    
-                    <Card className={`${
-                      message.type === 'user'
+
+                    <Card className={`${message.type === 'user'
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
-                    } min-w-0 break-words p-0`}>
+                      } min-w-0 break-words p-0`}>
                       <CardContent className="px-3 py-2">
                         <div className="prose prose-sm max-w-none dark:prose-invert break-words [&>*]:my-0 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                          <ReactMarkdown 
+                          <ReactMarkdown
                             components={{
                               p: ({ children }) => <p className="break-words whitespace-pre-wrap my-0">{children}</p>,
                               code: ({ children }) => <code className="break-words">{children}</code>,
@@ -266,14 +284,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                             {message.content}
                           </ReactMarkdown>
                         </div>
-                        <div className={`text-xs mt-1 ${
-                          message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                        }`}>
+                        <div className={`text-xs mt-1 ${message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                          }`}>
                           {message.timestamp.toLocaleTimeString()}
                         </div>
                       </CardContent>
                     </Card>
-                    
+
                     {message.type === 'user' && (
                       <div className="flex-shrink-0">
                         <div className="w-8 h-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
@@ -284,7 +301,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                   </div>
                 </div>
               ))}
-              
+
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="flex gap-2">
@@ -304,14 +321,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                   </div>
                 </div>
               )}
-              
+
               <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
         </CardContent>
-        
-        <div className="border-t p-3">
-          <form onSubmit={handleSubmit} className="flex gap-2">
+
+        <div className="border-t p-4">
+          <form onSubmit={handleSubmit} className="flex gap-3">
             <Textarea
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
@@ -329,14 +346,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
               type="submit"
               disabled={!inputValue.trim() || isLoading}
               size="sm"
-              className="self-end"
+              className="self-end px-4"
             >
               <Send className="h-4 w-4" />
             </Button>
           </form>
         </div>
       </Card>
-      
+
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { TranscriptResponse } from '@/types';
+import { TranscriptResponse, TranscriptSegment } from '@/types';
 import { appConfig } from '@/config/app';
 import { WEBSOCKET_CONFIG } from '@/config/websocket';
 
@@ -8,6 +8,7 @@ export const useWebSocket = (url?: string) => {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [transcript, setTranscript] = useState<string>('');
+  const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const [isReceiving, setIsReceiving] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -19,9 +20,9 @@ export const useWebSocket = (url?: string) => {
 
     console.log('Connecting to WebSocket:', wsUrl);
     const ws = new WebSocket(wsUrl);
-    
+
     ws.binaryType = 'arraybuffer';
-    
+
     ws.onopen = () => {
       setIsConnected(true);
       setSocket(ws);
@@ -33,7 +34,35 @@ export const useWebSocket = (url?: string) => {
       try {
         const data: TranscriptResponse = JSON.parse(event.data);
         console.log('Received transcript:', data);
-        if (data.transcript) {
+
+        // 處理新的 segments 格式
+        if (data.segments && data.segments.length > 0) {
+          setTranscriptSegments(prev => {
+            if (data.is_final) {
+              // 最終結果，追加到列表
+              return [...prev, ...data.segments];
+            } else {
+              // 臨時結果，替換最後一個臨時結果
+              const finalSegments = prev.filter(seg => seg.confidence !== undefined && seg.confidence > 0);
+              return [...finalSegments, ...data.segments];
+            }
+          });
+
+          // 更新顯示用的文字 transcript
+          const segmentText = data.segments.map(seg => seg.text).join(' ');
+          setTranscript(prev => {
+            if (data.is_final) {
+              return prev + segmentText + ' ';
+            } else {
+              // 替換最後的臨時結果
+              const parts = prev.split(' ');
+              const finalParts = parts.slice(0, -1);
+              return finalParts.join(' ') + (finalParts.length > 0 ? ' ' : '') + segmentText;
+            }
+          });
+        }
+        // 向後相容：處理舊的 transcript 格式
+        else if (data.transcript) {
           setTranscript(prev => {
             if (data.is_final) {
               return prev + data.transcript + ' ';
@@ -44,11 +73,12 @@ export const useWebSocket = (url?: string) => {
               return finalParts.join(' ') + (finalParts.length > 0 ? ' ' : '') + data.transcript;
             }
           });
-          setIsReceiving(true);
-          
-          // Clear receiving status after a delay
-          setTimeout(() => setIsReceiving(false), WEBSOCKET_CONFIG.RECEIVING_TIMEOUT);
         }
+
+        setIsReceiving(true);
+
+        // Clear receiving status after a delay
+        setTimeout(() => setIsReceiving(false), WEBSOCKET_CONFIG.RECEIVING_TIMEOUT);
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
       }
@@ -88,6 +118,7 @@ export const useWebSocket = (url?: string) => {
 
   const clearTranscript = () => {
     setTranscript('');
+    setTranscriptSegments([]);
   };
 
   useEffect(() => {
@@ -103,6 +134,7 @@ export const useWebSocket = (url?: string) => {
     clearTranscript,
     isConnected,
     transcript,
+    transcriptSegments,
     isReceiving
   };
 };
