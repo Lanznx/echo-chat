@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { AudioVisualizer } from './AudioVisualizer';
 import AudioDeviceSelector from './AudioDeviceSelector';
 import SystemAudioSelector from './SystemAudioSelector';
+import { ProviderSelector } from './ProviderSelector';
 import { AudioDevice } from '@/hooks/useSystemAudio';
 import { isTauri } from '@/utils/tauri';
+import { useSttProviders } from '@/hooks/useProviders';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -27,6 +29,7 @@ interface TranscriptSidebarProps {
   onDeviceSelect?: (deviceName: string) => void;
   onRefreshDevices?: () => void;
   onSystemAudioSelect?: (deviceName: string) => void;
+  onSttProviderChange?: (provider: string) => void;
 }
 
 export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
@@ -47,6 +50,9 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
   const [isMounted, setIsMounted] = useState(false);
   const [audioSourceType, setAudioSourceType] = useState<'microphone' | 'system'>('microphone');
   
+  // STT Provider management
+  const sttProviders = useSttProviders();
+  
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -64,17 +70,37 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
   };
   
   return (
-    <Card className="flex flex-col h-full border-r rounded-none">
-      <CardHeader className="pb-4">
+    <Card className="flex flex-col h-full border-0 rounded-none">
+      <CardHeader className="pb-3 px-4 py-3">
         <CardTitle className="flex items-center gap-2">
           <Mic className="h-5 w-5" />
           Live Transcript
         </CardTitle>
         
-        <div className="space-y-4">
+        <div className="space-y-2.5">
+          {/* STT Provider Selector */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Speech-to-Text Provider
+            </label>
+            <ProviderSelector
+              providers={sttProviders.providers}
+              selectedProvider={sttProviders.selectedProvider}
+              selectedModel={sttProviders.selectedModel}
+              onProviderChange={sttProviders.selectProvider}
+              onModelChange={sttProviders.selectModel}
+              isLoading={sttProviders.isLoading}
+              error={sttProviders.error}
+              onRefresh={sttProviders.refreshProviders}
+              showModels={false}
+              disabled={isRecording}
+              className="w-full"
+            />
+          </div>
+          
           {/* Audio Source Selector - Only show in Tauri environment */}
           {isMounted && isTauri() && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Tabs value={audioSourceType} onValueChange={(value) => setAudioSourceType(value as 'microphone' | 'system')}>
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="microphone" disabled={isRecording}>
@@ -109,10 +135,12 @@ export const TranscriptSidebar: React.FC<TranscriptSidebarProps> = ({
             </div>
           )}
           
-          <AudioVisualizer 
-            audioLevel={audioLevel} 
-            isRecording={isRecording}
-          />
+          <div className="px-1">
+            <AudioVisualizer 
+              audioLevel={audioLevel} 
+              isRecording={isRecording}
+            />
+          </div>
           
           <div className="flex gap-2">
             <Button

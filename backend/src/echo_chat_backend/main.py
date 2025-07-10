@@ -9,10 +9,21 @@ import json
 import logging
 import asyncio
 
-from .services.stt_service import get_stt_service
-from .services.llm_service import get_llm_service
+from .services.stt_service import get_stt_service, get_available_stt_providers
+from .services.llm_service import get_llm_service, get_available_llm_providers
 from .exceptions import EchoChatBaseException
 from .config.audio import SYSTEM_AUDIO_CONFIG
+
+# 導入所有 Provider 以確保自動註冊
+# 手動導入核心 Provider 確保註冊
+from .services.llm_service import OpenAiLlmAdapter, GeminiLlmAdapter
+from .services.stt_service import DeepgramSttAdapter
+
+# 導入額外 Provider
+try:
+    from . import providers
+except ImportError as e:
+    logger.warning(f"Failed to import additional providers: {e}")
 
 load_dotenv()
 
@@ -20,6 +31,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="EchoChat Backend", version="1.0.0")
+
+# 應用啟動時記錄已註冊的 Provider
+@app.on_event("startup")
+async def startup_event():
+    from .core import registry_manager
+    llm_providers = registry_manager.llm_registry.list_providers()
+    stt_providers = registry_manager.stt_registry.list_providers()
+    logger.info(f"Registered LLM providers: {llm_providers}")
+    logger.info(f"Registered STT providers: {stt_providers}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,11 +65,20 @@ class TranscriptResponse(BaseModel):
     confidence: Optional[float] = None
 
 @app.websocket("/ws/stream")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(
+    websocket: WebSocket, 
+    provider: Optional[str] = None,
+    model: Optional[str] = None
+):
     await websocket.accept()
-    logger.info("WebSocket connection established")
+    logger.info(f"WebSocket connection established with STT provider: {provider or 'default'}")
     
-    stt_service = get_stt_service()
+    try:
+        stt_service = get_stt_service(provider)
+    except Exception as e:
+        logger.error(f"Failed to initialize STT service: {e}")
+        await websocket.close(code=1003, reason=f"STT service initialization failed: {str(e)}")
+        return
     
     try:
         await stt_service.start_stream(websocket)
@@ -146,6 +175,26 @@ async def chat_stream(request: ChatRequest):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.get("/api/providers/llm")
+async def get_llm_providers():
+    """獲取可用的 LLM Provider 列表"""
+    try:
+        providers = get_available_llm_providers()
+        return {"providers": [provider.to_dict() for provider in providers]}
+    except Exception as e:
+        logger.error(f"Error getting LLM providers: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get LLM providers")
+
+@app.get("/api/providers/stt")
+async def get_stt_providers():
+    """獲取可用的 STT Provider 列表"""
+    try:
+        providers = get_available_stt_providers()
+        return {"providers": [provider.to_dict() for provider in providers]}
+    except Exception as e:
+        logger.error(f"Error getting STT providers: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get STT providers")
 
 if __name__ == "__main__":
     import uvicorn

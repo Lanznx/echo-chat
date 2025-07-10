@@ -6,12 +6,14 @@ import { ChatMessage, ChatRequest, ChatResponse } from '@/types';
 import { SettingsModal } from './SettingsModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Replaced by ProviderSelector
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Settings, Send, Bot, User, Loader2 } from 'lucide-react';
 import { appConfig } from '@/config/app';
+import { useLlmProviders } from '@/hooks/useProviders';
+import { ProviderSelector } from './ProviderSelector';
 
 interface ChatInterfaceProps {
   transcript: string;
@@ -27,7 +29,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState('你是一個聰明的 AI 參與會議者. 我需要你用繁體中文，並且根據會議的前後文回答問題.');
   const [userRole, setUserRole] = useState('');
-  const [llmProvider, setLlmProvider] = useState<'openai' | 'gemini'>('openai');
+  // Dynamic LLM provider management
+  const llmProviders = useLlmProviders();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,7 +57,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
   const buildChatRequest = (query: string): ChatRequest => ({
     context: transcript,
     query: query,
-    provider: llmProvider,
+    provider: llmProviders.selectedProvider,
     system_prompt: systemPrompt,
     user_role: userRole
   });
@@ -185,8 +188,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      <Card className="flex-1 flex flex-col h-full border-l-0 rounded-none">
-        <CardHeader className="border-b">
+      <Card className="flex-1 flex flex-col h-full border-0 rounded-none">
+        <CardHeader className="border-b px-4 py-3">
           <div className="flex justify-between items-center">
             <div>
               <CardTitle className="flex items-center gap-2">
@@ -197,16 +200,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
                 Ask questions about your transcript or chat naturally
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Select value={llmProvider} onValueChange={(value) => setLlmProvider(value as 'openai' | 'gemini')}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="gemini">Gemini</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-2 min-w-0">
+              <ProviderSelector
+                providers={llmProviders.providers}
+                selectedProvider={llmProviders.selectedProvider}
+                selectedModel={llmProviders.selectedModel}
+                onProviderChange={llmProviders.selectProvider}
+                onModelChange={llmProviders.selectModel}
+                isLoading={llmProviders.isLoading}
+                error={llmProviders.error}
+                onRefresh={llmProviders.refreshProviders}
+                showModels={false}
+                className="min-w-0 flex-1"
+              />
               <Button
                 variant="ghost"
                 size="sm"
@@ -304,7 +310,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
           </ScrollArea>
         </CardContent>
         
-        <div className="border-t p-4">
+        <div className="border-t p-3">
           <form onSubmit={handleSubmit} className="flex gap-2">
             <Textarea
               value={inputValue}

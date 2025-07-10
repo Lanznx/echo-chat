@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, List
 import json
 import asyncio
 import logging
@@ -12,6 +12,7 @@ import threading
 
 from ..exceptions import SttServiceError, ApiKeyError
 from ..config.audio import SYSTEM_AUDIO_CONFIG
+from ..core import ProviderType, ProviderMetadata, registry_manager, register_provider, config_manager
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +34,42 @@ class ISttServiceProvider(ABC):
         logger.error(f"{provider} STT error: {error}")
         raise SttServiceError(str(error), provider)
 
+@register_provider(ProviderMetadata(
+    name="deepgram",
+    display_name="Deepgram STT",
+    description="Deepgram Speech-to-Text with real-time streaming capabilities",
+    version="1.0.0",
+    provider_type=ProviderType.STT,
+    requires_api_key=True,
+    config_schema={
+        "api_key": {"type": "string", "required": True, "description": "Deepgram API Key"},
+        "model": {"type": "string", "required": False, "description": "Model name", "default": "nova-2"},
+        "language": {"type": "string", "required": False, "description": "Language code", "default": "zh-TW"},
+        "sample_rate": {"type": "integer", "required": False, "description": "Sample rate", "default": 48000}
+    },
+    supported_models=["nova-2", "nova", "enhanced", "base"],
+    default_model="nova-2",
+    capabilities=["streaming", "real-time", "multilingual", "punctuation"],
+    author="Deepgram",
+    homepage="https://deepgram.com"
+))
 class DeepgramSttAdapter(ISttServiceProvider):
-    def __init__(self, api_key: str):
-        self.api_key = api_key
+    def __init__(self, api_key: str = None, **kwargs):
+        # 使用配置管理器獲取配置
+        metadata = registry_manager.stt_registry.get_metadata("deepgram")
+        if metadata:
+            config = config_manager.get_provider_config("deepgram", metadata.config_schema)
+            self.api_key = api_key or config.get("api_key")
+            self.model = config.get("model", "nova-2")
+            self.language = config.get("language", "zh-TW")
+            self.sample_rate = config.get("sample_rate", SYSTEM_AUDIO_CONFIG.SAMPLE_RATE)
+        else:
+            # 向後相容
+            self.api_key = api_key
+            self.model = kwargs.get("model", "nova-2")
+            self.language = kwargs.get("language", "zh-TW")
+            self.sample_rate = kwargs.get("sample_rate", SYSTEM_AUDIO_CONFIG.SAMPLE_RATE)
+        
         self.websocket = None
         self.deepgram_connection = None
         self.client = None
@@ -54,12 +88,12 @@ class DeepgramSttAdapter(ISttServiceProvider):
         self.deepgram_connection = self.client.listen.asyncwebsocket.v("1")
         
         await self.deepgram_connection.start({
-            "model": "nova-2",
-            "language": "zh-TW",  # Changed to Traditional Chinese
+            "model": self.model,
+            "language": self.language,
             "smart_format": True,
             "interim_results": True,
             "encoding": "linear16",
-            "sample_rate": SYSTEM_AUDIO_CONFIG.SAMPLE_RATE,
+            "sample_rate": self.sample_rate,
             "channels": 1,
             "endpointing": SYSTEM_AUDIO_CONFIG.ENDPOINTING,
             "vad_events": True,  # Voice activity detection
@@ -147,9 +181,40 @@ class DeepgramSttAdapter(ISttServiceProvider):
                 logger.error(f"Error in transcript sender: {e}")
                 break
 
-def get_stt_service() -> ISttServiceProvider:
-    deepgram_api_key = os.getenv("DEEPGRAM_API_KEY")
-    if not deepgram_api_key:
-        raise ApiKeyError("deepgram")
+def get_stt_service(provider: Optional[str] = None) -> ISttServiceProvider:
+    """獲取 STT 服務實例 - 支援 Registry 系統"""
+    # Use provided provider, fallback to environment variable, then default to deepgram
+    selected_provider = (provider or os.getenv("STT_PROVIDER", "deepgram")).lower()
     
-    return DeepgramSttAdapter(deepgram_api_key)
+    # 嘗試從 Registry 獲取 Provider
+    stt_registry = registry_manager.stt_registry
+    provider_class = stt_registry.get_provider(selected_provider)
+    
+    if provider_class:
+        # 從 Registry 獲取 Provider 元數據
+        metadata = stt_registry.get_metadata(selected_provider)
+        if not metadata:
+            raise SttServiceError(f"Provider metadata not found: {selected_provider}", selected_provider)
+        
+        # 獲取 API Key
+        api_key_env = f"{selected_provider.upper()}_API_KEY"
+        api_key = os.getenv(api_key_env)
+        if metadata.requires_api_key and not api_key:
+            raise ApiKeyError(selected_provider)
+        
+        # 創建 Provider 實例
+        return provider_class(api_key)
+    
+    # 向後相容性 - 硬編碼的 Provider (將來可移除)
+    if selected_provider == "deepgram":
+        deepgram_api_key = os.getenv("DEEPGRAM_API_KEY")
+        if not deepgram_api_key:
+            raise ApiKeyError("deepgram")
+        return DeepgramSttAdapter(deepgram_api_key)
+    
+    else:
+        raise SttServiceError(f"Unsupported STT provider: {selected_provider}", "unknown")
+
+def get_available_stt_providers() -> List[ProviderMetadata]:
+    """獲取可用的 STT Provider 列表"""
+    return registry_manager.stt_registry.list_metadata()
