@@ -10,6 +10,9 @@ import os
 import queue
 import threading
 
+from ..exceptions import SttServiceError, ApiKeyError
+from ..config.audio import SYSTEM_AUDIO_CONFIG
+
 logger = logging.getLogger(__name__)
 
 class ISttServiceProvider(ABC):
@@ -24,6 +27,11 @@ class ISttServiceProvider(ABC):
     @abstractmethod
     async def stop_stream(self) -> None:
         pass
+    
+    def _handle_error(self, error: Exception, provider: str) -> None:
+        """Standardized error handling for all STT providers"""
+        logger.error(f"{provider} STT error: {error}")
+        raise SttServiceError(str(error), provider)
 
 class DeepgramSttAdapter(ISttServiceProvider):
     def __init__(self, api_key: str):
@@ -51,16 +59,16 @@ class DeepgramSttAdapter(ISttServiceProvider):
             "smart_format": True,
             "interim_results": True,
             "encoding": "linear16",
-            "sample_rate": 48000,  # Match Tauri's actual sample rate
+            "sample_rate": SYSTEM_AUDIO_CONFIG.SAMPLE_RATE,
             "channels": 1,
-            "endpointing": 300,  # Extend endpointing for better streaming
+            "endpointing": SYSTEM_AUDIO_CONFIG.ENDPOINTING,
             "vad_events": True,  # Voice activity detection
             "punctuate": True
         })
         
         # Use simple function callbacks instead of methods
         self.deepgram_connection.on(LiveTranscriptionEvents.Transcript, self._handle_transcript)
-        self.deepgram_connection.on(LiveTranscriptionEvents.Error, self._handle_error)
+        self.deepgram_connection.on(LiveTranscriptionEvents.Error, self._handle_deepgram_error)
         
         # Direct sending, no need for separate task
         
@@ -72,7 +80,7 @@ class DeepgramSttAdapter(ISttServiceProvider):
                 await self.deepgram_connection.send(audio_data)
                 logger.debug(f"Sent {len(audio_data)} bytes to Deepgram")
             except Exception as e:
-                logger.error(f"Error sending audio to Deepgram: {e}")
+                self._handle_error(e, "deepgram")
     
     async def stop_stream(self) -> None:
         self._running = False
@@ -114,10 +122,10 @@ class DeepgramSttAdapter(ISttServiceProvider):
                 logger.debug("No transcript data in result")
                         
         except Exception as e:
-            logger.error(f"Error processing transcript: {e}")
+            self._handle_error(e, "deepgram")
     
-    async def _handle_error(self, *args, **kwargs):
-        """Async function to handle errors"""
+    async def _handle_deepgram_error(self, *args, **kwargs):
+        """Async function to handle Deepgram-specific errors"""
         error = kwargs.get('error')
         logger.error(f"Deepgram error: {error}")
     
@@ -142,6 +150,6 @@ class DeepgramSttAdapter(ISttServiceProvider):
 def get_stt_service() -> ISttServiceProvider:
     deepgram_api_key = os.getenv("DEEPGRAM_API_KEY")
     if not deepgram_api_key:
-        raise ValueError("DEEPGRAM_API_KEY environment variable is required")
+        raise ApiKeyError("deepgram")
     
     return DeepgramSttAdapter(deepgram_api_key)

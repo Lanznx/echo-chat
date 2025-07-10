@@ -98,3 +98,21 @@ export const SENSITIVITY_PRESETS = {
 export type SensitivityLevel = keyof typeof SENSITIVITY_PRESETS;
 export type AudioProcessingConfig = typeof AUDIO_PROCESSING_CONFIG;
 export type AudioVisualizerConfig = typeof AUDIO_VISUALIZER_CONFIG;
+
+// Audio Recording Configuration
+export const AUDIO_CONFIG = {
+  SAMPLE_RATE: 16000,
+  BUFFER_SIZE: 8192,
+  FFT_SIZE: 256,
+  CONSTRAINTS: {
+    sampleRate: 16000,
+    channelCount: 1,
+    echoCancellation: true,
+    noiseSuppression: true
+  }
+} as const;
+
+export const SYSTEM_AUDIO_CONFIG = {
+  SAMPLE_RATE: 48000,
+  ENDPOINTING: 300
+} as const;

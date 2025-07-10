@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Settings, Send, Bot, User, Loader2 } from 'lucide-react';
+import { appConfig } from '@/config/app';
 
 interface ChatInterfaceProps {
   transcript: string;
@@ -36,99 +37,135 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
     scrollToBottom();
   }, [messages]);
 
+  const createUserMessage = (query: string): ChatMessage => ({
+    id: Date.now().toString(),
+    content: query,
+    type: 'user',
+    timestamp: new Date()
+  });
+
+  const createAssistantMessage = (): ChatMessage => ({
+    id: (Date.now() + 1).toString(),
+    content: '',
+    type: 'assistant',
+    timestamp: new Date()
+  });
+
+  const buildChatRequest = (query: string): ChatRequest => ({
+    context: transcript,
+    query: query,
+    provider: llmProvider,
+    system_prompt: systemPrompt,
+    user_role: userRole
+  });
+
+  const updateMessageContent = (messageId: string, newContent: string) => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, content: newContent }
+          : msg
+      )
+    );
+  };
+
+  const appendMessageChunk = (messageId: string, chunk: string) => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, content: msg.content + chunk }
+          : msg
+      )
+    );
+  };
+
+  const processStreamLine = (line: string, assistantMessageId: string): boolean => {
+    if (!line.startsWith('data: ')) return false;
+    
+    try {
+      const data = JSON.parse(line.slice(6));
+      console.log('Received streaming data:', data);
+      
+      if (data.chunk) {
+        appendMessageChunk(assistantMessageId, data.chunk);
+        return false;
+      } else if (data.done) {
+        console.log('Stream completed');
+        return true;
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
+    } catch (e) {
+      console.error('Error parsing streaming data:', e, 'Line:', line);
+    }
+    return false;
+  };
+
+  const handleStreamingResponse = async (response: Response, assistantMessageId: string) => {
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let streamDone = false;
+
+    while (!streamDone) {
+      const { done, value } = await reader!.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        streamDone = processStreamLine(line, assistantMessageId);
+        if (streamDone) break;
+      }
+    }
+  };
+
+  const sendChatRequest = async (chatRequest: ChatRequest): Promise<Response> => {
+    const apiUrl = `${appConfig.apiBaseUrl}/api/chat/stream`;
+    console.log('Sending streaming request to:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(chatRequest),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get response: ${response.status}`);
+    }
+
+    return response;
+  };
+
+  const handleChatError = (error: unknown, assistantMessageId: string) => {
+    console.error('Error sending message:', error);
+    updateMessageContent(
+      assistantMessageId,
+      'Sorry, there was an error processing your request. Please try again.'
+    );
+  };
+
   const sendMessage = async (query: string) => {
     if (!query.trim()) return;
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      content: query,
-      type: 'user',
-      timestamp: new Date()
-    };
-
+    const userMessage = createUserMessage(query);
+    const assistantMessage = createAssistantMessage();
+    
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
-
-    // Add empty assistant message that will be streamed
-    const assistantMessageId = (Date.now() + 1).toString();
-    const assistantMessage: ChatMessage = {
-      id: assistantMessageId,
-      content: '',
-      type: 'assistant',
-      timestamp: new Date()
-    };
-
     setMessages(prev => [...prev, assistantMessage]);
 
     try {
-      console.log('Sending streaming request to:', `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/chat/stream`);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/chat/stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          context: transcript,
-          query: query,
-          provider: llmProvider,
-          system_prompt: systemPrompt,
-          user_role: userRole
-        } as ChatRequest),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to get response: ${response.status}`);
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let streamDone = false;
-
-      while (!streamDone) {
-        const { done, value } = await reader!.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              console.log('Received streaming data:', data);
-              if (data.chunk) {
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === assistantMessageId 
-                      ? { ...msg, content: msg.content + data.chunk }
-                      : msg
-                  )
-                );
-              } else if (data.done) {
-                console.log('Stream completed');
-                streamDone = true;
-                break;
-              } else if (data.error) {
-                throw new Error(data.error);
-              }
-            } catch (e) {
-              console.error('Error parsing streaming data:', e, 'Line:', line);
-            }
-          }
-        }
-      }
+      const chatRequest = buildChatRequest(query);
+      const response = await sendChatRequest(chatRequest);
+      await handleStreamingResponse(response, assistantMessage.id);
     } catch (error) {
-      console.error('Error sending message:', error);
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === assistantMessageId 
-            ? { ...msg, content: 'Sorry, there was an error processing your request. Please try again.' }
-            : msg
-        )
-      );
+      handleChatError(error, assistantMessage.id);
     } finally {
       setIsLoading(false);
     }

@@ -11,6 +11,8 @@ import asyncio
 
 from .services.stt_service import get_stt_service
 from .services.llm_service import get_llm_service
+from .exceptions import EchoChatBaseException
+from .config.audio import SYSTEM_AUDIO_CONFIG
 
 load_dotenv()
 
@@ -96,9 +98,12 @@ async def chat_completion(request: ChatRequest):
             user_role=request.user_role
         )
         return ChatResponse(response=response)
+    except EchoChatBaseException as e:
+        logger.error(f"Chat completion error: {e.message}")
+        raise HTTPException(status_code=500, detail=e.message)
     except Exception as e:
-        logger.error(f"Chat completion error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected chat completion error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatRequest):
@@ -117,13 +122,16 @@ async def chat_stream(request: ChatRequest):
             for i, word in enumerate(words):
                 chunk = word + (' ' if i < len(words) - 1 else '')
                 yield f"data: {json.dumps({'chunk': chunk})}\n\n"
-                await asyncio.sleep(0.1)  # Small delay for streaming effect
+                await asyncio.sleep(SYSTEM_AUDIO_CONFIG.STREAMING_DELAY)
             
             yield f"data: {json.dumps({'done': True})}\n\n"
             
+        except EchoChatBaseException as e:
+            logger.error(f"Chat streaming error: {e.message}")
+            yield f"data: {json.dumps({'error': e.message})}\n\n"
         except Exception as e:
-            logger.error(f"Chat streaming error: {e}")
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            logger.error(f"Unexpected chat streaming error: {e}")
+            yield f"data: {json.dumps({'error': 'Internal server error'})}\n\n"
     
     return StreamingResponse(
         generate_stream(),

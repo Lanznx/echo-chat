@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { TranscriptResponse } from '@/types';
+import { appConfig } from '@/config/app';
+import { WEBSOCKET_CONFIG } from '@/config/websocket';
 
-export const useWebSocket = (url: string) => {
+export const useWebSocket = (url?: string) => {
+  const wsUrl = url || appConfig.websocketUrl;
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [transcript, setTranscript] = useState<string>('');
@@ -14,8 +17,8 @@ export const useWebSocket = (url: string) => {
       return;
     }
 
-    console.log('Connecting to WebSocket:', url);
-    const ws = new WebSocket(url);
+    console.log('Connecting to WebSocket:', wsUrl);
+    const ws = new WebSocket(wsUrl);
     
     ws.binaryType = 'arraybuffer';
     
@@ -44,7 +47,7 @@ export const useWebSocket = (url: string) => {
           setIsReceiving(true);
           
           // Clear receiving status after a delay
-          setTimeout(() => setIsReceiving(false), 1000);
+          setTimeout(() => setIsReceiving(false), WEBSOCKET_CONFIG.RECEIVING_TIMEOUT);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
