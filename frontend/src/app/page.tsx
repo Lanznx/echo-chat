@@ -74,13 +74,11 @@ export default function Home() {
   const handleSttProviderChange = (provider: string) => {
     // STT provider change is handled by the useSttProviders hook
     // WebSocket URL will be rebuilt automatically
-    console.log('STT Provider changed to:', provider);
   };
 
   const handleSystemAudioSelect = async (deviceName: string) => {
     try {
       setSelectedSystemDevice(deviceName);
-      console.log('System audio device selected:', deviceName);
     } catch (error) {
       console.error('Failed to select system audio device:', error);
     }

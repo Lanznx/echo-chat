@@ -20,9 +20,7 @@ export class ProviderService {
 
   private async fetchProviders(type: 'llm' | 'stt'): Promise<ProviderMetadata[]> {
     try {
-      console.log('AppConfig apiBaseUrl:', appConfig.apiBaseUrl);
       const url = `${appConfig.apiBaseUrl}/api/providers/${type}`;
-      console.log(`Fetching ${type} providers from:`, url);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -33,7 +31,6 @@ export class ProviderService {
         signal: AbortSignal.timeout(10000) // 10 second timeout
       });
       
-      console.log(`Response status for ${type} providers:`, response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -42,7 +39,6 @@ export class ProviderService {
       }
       
       const data: ProvidersResponse = await response.json();
-      console.log(`Received ${type} providers:`, data.providers);
       return data.providers;
     } catch (error) {
       console.error(`Error fetching ${type} providers:`, error);

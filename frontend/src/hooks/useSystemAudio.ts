@@ -28,7 +28,6 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
   // List available audio devices
   const listDevices = async () => {
     if (!isTauri()) {
-      console.log('Not in Tauri environment, skipping device listing');
       return;
     }
     
@@ -52,7 +51,6 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
   // List system audio devices
   const listSystemAudioDevices = async () => {
     if (!isTauri()) {
-      console.log('Not in Tauri environment, skipping system audio device listing');
       return;
     }
     
@@ -117,7 +115,6 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
       const device = deviceName || selectedDevice;
       await invoke('start_system_audio_capture', { device_name: device });
       setIsCapturing(true);
-      console.log('System audio capture started with device:', device);
     } catch (error) {
       console.error('Failed to start system audio capture:', error);
       throw error;
@@ -127,13 +124,11 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
   // Stop system audio capture
   const stopCapture = async () => {
     if (!isTauri()) {
-      console.log('Not in Tauri environment, nothing to stop');
       return;
     }
     
     // Only try to stop if we're actually capturing
     if (!isCapturing) {
-      console.log('Audio capture not running, nothing to stop');
       return;
     }
     
@@ -149,7 +144,6 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
         unlistenRef.current = null;
       }
       
-      console.log('System audio capture stopped');
     } catch (error) {
       console.error('Failed to stop system audio capture:', error);
       // Don't throw error to prevent runtime crashes
@@ -230,7 +224,6 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
       await invoke('start_system_audio_capture_device', { deviceName });
       setIsSystemAudioCapturing(true);
       setSelectedSystemDevice(deviceName);
-      console.log('System audio capture started with device:', deviceName);
     } catch (error) {
       console.error('Failed to start system audio capture:', error);
       throw error;
@@ -240,12 +233,10 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
   // Stop system audio capture
   const stopSystemAudioCapture = async () => {
     if (!isTauri()) {
-      console.log('Not in Tauri environment, nothing to stop');
       return;
     }
     
     if (!isSystemAudioCapturing) {
-      console.log('System audio capture not running, nothing to stop');
       return;
     }
     
@@ -261,7 +252,6 @@ export const useSystemAudio = (onAudioData: (data: ArrayBuffer) => void) => {
         systemUnlistenRef.current = null;
       }
       
-      console.log('System audio capture stopped');
     } catch (error) {
       console.error('Failed to stop system audio capture:', error);
     }

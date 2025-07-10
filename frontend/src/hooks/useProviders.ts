@@ -11,7 +11,6 @@ export const useProviders = (type: 'llm' | 'stt') => {
 
   const loadProviders = useCallback(async (forceRefresh = false) => {
     try {
-      console.log(`Loading ${type} providers, forceRefresh:`, forceRefresh);
       setIsLoading(true);
       setError(null);
       
@@ -19,13 +18,11 @@ export const useProviders = (type: 'llm' | 'stt') => {
         ? await providerService.getLlmProviders(forceRefresh)
         : await providerService.getSttProviders(forceRefresh);
       
-      console.log(`Loaded ${type} providers:`, providersData);
       setProviders(providersData);
       
       // Set default provider if none selected
       if (!selectedProvider && providersData.length > 0) {
         const defaultProvider = providersData[0];
-        console.log(`Setting default ${type} provider:`, defaultProvider.name);
         setSelectedProvider(defaultProvider.name);
         setSelectedModel(defaultProvider.default_model);
       }

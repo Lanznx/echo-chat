@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useId } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ChatMessage, ChatRequest, ChatResponse } from '@/types';
 import { SettingsModal } from './SettingsModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Replaced by ProviderSelector
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -96,13 +95,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
 
     try {
       const data = JSON.parse(line.slice(6));
-      console.log('Received streaming data:', data);
 
       if (data.chunk) {
         appendMessageChunk(assistantMessageId, data.chunk);
         return false;
       } else if (data.done) {
-        console.log('Stream completed');
         return true;
       } else if (data.error) {
         throw new Error(data.error);
@@ -136,7 +133,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ transcript }) => {
 
   const sendChatRequest = async (chatRequest: ChatRequest): Promise<Response> => {
     const apiUrl = `${appConfig.apiBaseUrl}/api/chat/stream`;
-    console.log('Sending streaming request to:', apiUrl);
 
     const response = await fetch(apiUrl, {
       method: 'POST',

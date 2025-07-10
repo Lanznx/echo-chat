@@ -14,11 +14,9 @@ export const useWebSocket = (url?: string) => {
 
   const connect = () => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connected');
       return;
     }
 
-    console.log('Connecting to WebSocket:', wsUrl);
     const ws = new WebSocket(wsUrl);
 
     ws.binaryType = 'arraybuffer';
@@ -27,13 +25,11 @@ export const useWebSocket = (url?: string) => {
       setIsConnected(true);
       setSocket(ws);
       socketRef.current = ws;
-      console.log('WebSocket connected successfully');
     };
 
     ws.onmessage = (event) => {
       try {
         const data: TranscriptResponse = JSON.parse(event.data);
-        console.log('Received transcript:', data);
 
         // 處理新的 segments 格式
         if (data.segments && data.segments.length > 0) {
